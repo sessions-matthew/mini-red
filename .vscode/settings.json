@@ -1,0 +1,21 @@
+{
+    "C_Cpp.default.compileCommands": "/Users/matthewsessions/mini-red/builddir/compile_commands.json",
+    "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild",
+    "files.associations": {
+        "map": "cpp",
+        "queue": "cpp",
+        "bitset": "cpp",
+        "iostream": "cpp",
+        "random": "cpp",
+        "__bit_reference": "cpp",
+        "__node_handle": "cpp",
+        "deque": "cpp",
+        "limits": "cpp",
+        "optional": "cpp",
+        "ratio": "cpp",
+        "regex": "cpp",
+        "scoped_allocator": "cpp",
+        "tuple": "cpp",
+        "vector": "cpp"
+    }
+}

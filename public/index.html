@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ReactJS WebApp</title>
+    <script src="react.development.js" crossorigin></script>
+    <script src="react-dom.development.js" crossorigin></script>
+    <script src="babel.min.js"></script>
+    <!-- <script src="interact.min.js"></script> -->
+    <!-- <script type="text/babel" src="reactablejs.js" ></script> -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/react-dragula@1.1.17/react-dragula.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/react-dragula@1.1.17/dist/dragula.min.css"> -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-grid-layout/1.5.0/react-grid-layout.min.js" integrity="sha512-lBEnyK7/R87irj4hWPm5kZ8LOascLPy/HCcaD0G2+vZNqhNiPW7ExKereH8UAQm2fEWi6owAtoE1a57d1EOItQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/react-grid-layout/1.5.0/css/styles.min.css" integrity="sha512-pU29HsjFd3DpljZrPoc2gE1iF+OwUPDd7og3yUuH1l0tcOqimcmzXlyb1GkG6KjnKssUjRLoWP1NC1Lt9JB3+A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="text/babel">
+      function generateUUID() {
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+          /[xy]/g,
+          function (c) {
+            const r = (Math.random() * 16) | 0,
+              v = c === "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          }
+        );
+      }
+
+      function LineComponent({ start, end, deleteLine }) {
+        if (!start || !end) return null;
+
+        const startX = start.x + 100; // Center of the start component
+        const startY = start.y + 25; // Center of the start component
+        const endX = end.x + 0; // Center of the end component
+        const endY = end.y + 25; // Center of the end component
+
+        const [isHovered, setIsHovered] = React.useState(false);
+
+        return (
+          <svg
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              pointerEvents: "none",
+              width: "100%",
+              height: "100%",
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteLine();
+            }}
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            <line
+              x1={startX}
+              y1={startY}
+              x2={endX}
+              y2={endY}
+              stroke={isHovered ? "red" : "black"}
+              strokeWidth="5"
+              pointerEvents="auto"
+            />
+          </svg>
+        );
+      }
+
+      function TranslucentLineComponent({ start, end }) {
+        if (!start || !end) return null;
+
+        const startX = start.x + 100; // Center of the start component
+        const startY = start.y + 25; // Center of the start component
+        const endX = end.x + 0; // Center of the end component
+        const endY = end.y + 25; // Center of the end component
+
+        return (
+          // <reactable line={{ start, end }} />
+          <svg
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              pointerEvents: "none",
+              width: "100%",
+              height: "100%",
+            }}
+          >
+            <line
+              x1={startX}
+              y1={startY}
+              x2={endX}
+              y2={endY}
+              stroke="rgba(0, 0, 0, 0.5)"
+              strokeWidth="5"
+              pointerEvents="auto"
+            />
+          </svg>
+        );
+      }
+
+      function SquareComponent({
+        positionChange,
+        style,
+        properties,
+        onCircleClick,
+        isConnectionStart,
+        onSquareClick,
+        isSeleteced,
+      }) {
+        const [isDragging, setIsDragging] = React.useState(false);
+        const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
+
+        function handleDragStart(event) {
+          event.preventDefault();
+          setIsDragging(true);
+          setDragStart({ x: event.clientX, y: event.clientY });
+        }
+
+        function handleDrag(event) {
+          if (!isDragging) return;
+          event.preventDefault();
+          const deltaX = event.clientX - dragStart.x;
+          const deltaY = event.clientY - dragStart.y;
+
+          positionChange({
+            x: properties.x + deltaX,
+            y: properties.y + deltaY,
+          });
+          setDragStart({ x: event.clientX, y: event.clientY });
+        }
+
+        function handleDragEnd() {
+          setIsDragging(false);
+        }
+        const selectedStyle = isSeleteced
+          ? { border: "2px solid blue", boxShadow: "0 0 10px blue" }
+          : {};
+
+        const squareStyle = {
+          ...style,
+          ...selectedStyle,
+          width: "100px",
+          height: "50px",
+          border: "1px solid #000",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          cursor: isDragging ? "grabbing" : "grab",
+          backgroundColor: "#fff",
+        };
+
+        const circleStyle = {
+          width: "20px",
+          height: "20px",
+          borderRadius: "50%",
+          backgroundColor: "#000",
+          position: "absolute",
+        };
+
+        const inputCircleStyle = {
+          ...circleStyle,
+          top: "calc(50% - 10px)",
+          left: "-10px",
+        };
+
+        const outputCircleStyle = {
+          ...circleStyle,
+          top: "calc(50% - 10px)",
+          right: "-10px",
+          backgroundColor: isConnectionStart ? "red" : "#000",
+        };
+
+        return (
+          <div
+            style={squareStyle}
+            onClick={() => onSquareClick(properties)}
+            onMouseDown={handleDragStart}
+            onMouseMove={handleDrag}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
+          >
+            {(properties.mode === "Output" ||
+              properties.mode === "InputOutput") && (
+              <div
+                onClick={() => onCircleClick(properties.id, "input")}
+                style={inputCircleStyle}
+              ></div>
+            )}
+            {(properties.mode === "Input" ||
+              properties.mode === "InputOutput") && (
+              <div
+                onClick={() => onCircleClick(properties.id, "output")}
+                style={outputCircleStyle}
+              ></div>
+            )}
+            <span style={{ pointerEvents: "none" }}>{properties.name}</span>
+          </div>
+        );
+      }
+
+      function ParameterInput({ param, handleParamChange }) {
+        const [value, setValue] = React.useState(param.value);
+
+        return (
+          <div>
+            <strong>{param.name}:</strong>
+            <input
+              type={param.type}
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                handleParamChange(param.name, e.target.value);
+              }}
+            />
+          </div>
+        );
+      }
+
+      function RightSidebar({
+        selectedSquare,
+        handlePropertyChange,
+        handleNameChange,
+        handleDeleteSquare,
+      }) {
+        if (!selectedSquare) return null;
+
+        const [name, setName] = React.useState();
+
+        React.useEffect(() => {
+          setName(selectedSquare.name);
+        }, [selectedSquare]);
+
+        const rightSidebarStyle = {
+          display: "flex",
+          flexDirection: "column",
+          gap: "10px",
+          padding: "10px",
+          border: "1px solid #ccc",
+          width: "200px",
+          height: "100vh",
+          position: "fixed",
+          right: 0,
+          top: 0,
+          backgroundColor: "#f4f4f4",
+        };
+
+        return (
+          <div style={rightSidebarStyle}>
+            <h3>Properties</h3>
+            <label>
+              Name:
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  handleNameChange(selectedSquare.id, e.target.value);
+                }}
+              />
+            </label>
+            {selectedSquare.parameters &&
+              selectedSquare.parameters.map((param, index) => (
+                <ParameterInput
+                  key={selectedSquare.id + index}
+                  param={param}
+                  selectedSquare={selectedSquare}
+                  handleParamChange={(name, value) =>
+                    handlePropertyChange(selectedSquare.id, name, value)
+                  }
+                />
+              ))}
+            <p>ID: {selectedSquare.id}</p>
+            <button onClick={handleDeleteSquare}>Delete</button>
+          </div>
+        );
+      }
+
+      function App() {
+        const [selectedSquare, setSelectedSquare] = React.useState(null);
+        const [generatedJSON, setGeneratedJSON] = React.useState(null);
+        const [realJSON, setRealJSON] = React.useState(null);
+
+        function handleSquareClick(square) {
+          setSelectedSquare(square);
+        }
+
+        function handleNameChange(id, newName) {
+          setPlacedSquares((prevSquares) =>
+            prevSquares.map((square) =>
+              square.id === id ? { ...square, name: newName } : square
+            )
+          );
+        }
+
+        function handlePropertyChange(id, paramName, newValue) {
+          setPlacedSquares((prevSquares) =>
+            prevSquares.map((square) =>
+              square.id === id
+                ? {
+                    ...square,
+                    parameters: square.parameters.map((param) =>
+                      param.name === paramName
+                        ? { ...param, value: newValue }
+                        : param
+                    ),
+                  }
+                : square
+            )
+          );
+        }
+
+        const sidebarStyle = {
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "10px",
+          padding: "10px",
+          border: "1px solid #ccc",
+          width: "200px",
+          position: "fixed",
+          left: 0,
+          top: 0,
+          backgroundColor: "#f4f4f4",
+          overflowY: "auto",
+          maxHeight: "100vh",
+        };
+
+        const cardStyle = {
+          border: "1px solid #ccc",
+          padding: "10px",
+          borderRadius: "5px",
+          backgroundColor: "#fff",
+          height: "50px",
+        };
+
+        const [cards, setCards] = React.useState([
+          { id: 1, name: "Trigger", type: "Trigger", mode: "Input" },
+          {
+            id: 2,
+            name: "ValueSetter",
+            type: "ValueSetter",
+            mode: "InputOutput",
+            parameters: [
+              { name: "Value", type: "number", value: 0 },
+              { name: "Expression", type: "string", value: "" },
+            ],
+          },
+          {
+            id: 3,
+            name: "LinkIn",
+            type: "LinkIn",
+            mode: "Input",
+          },
+          {
+            id: 4,
+            name: "LinkOut",
+            type: "LinkOut",
+            mode: "Output",
+            parameters: [{ name: "Target", type: "string", value: "" }],
+          },
+          {
+            id: 5,
+            name: "Logger",
+            type: "Logger",
+            mode: "Output",
+            parameters: [{ name: "Prefix", type: "string", value: "" }],
+          },
+          {
+            id: 6,
+            name: "Filter",
+            type: "Filter",
+            mode: "InputOutput",
+            parameters: [
+              { name: "Condition", type: "string", value: "" },
+              { name: "Variable", type: "string", value: "" },
+            ],
+          },
+          {
+            id: 7,
+            name: "Math",
+            type: "Math",
+            mode: "InputOutput",
+            parameters: [
+              { name: "Operation", type: "string", value: "" },
+              { name: "Variable", type: "string", value: "" },
+            ],
+          },
+          {
+            id: 8,
+            name: "Counter",
+            type: "Counter",
+            mode: "InputOutput",
+            parameters: [
+              { name: "Variable", type: "string", value: "" },
+              { name: "Step", type: "number", value: 1 },
+            ],
+          },
+          {
+            id: 9,
+            name: "Delay",
+            type: "Delay",
+            mode: "InputOutput",
+            parameters: [
+              { name: "Delay", type: "number", value: 0 },
+              { name: "Variable", type: "string", value: "" },
+            ],
+          },
+          {
+            id: 10,
+            name: "Script",
+            type: "Script",
+            mode: "InputOutput",
+            parameters: [{ name: "Expression", type: "string", value: "" }],
+          },
+          {
+            id: 11,
+            name: "MqttIn",
+            type: "MqttIn",
+            mode: "Input",
+            parameters: [
+              { name: "Topic", type: "string", value: "" },
+              { name: "Variable", type: "string", value: "" },
+              { name: "Host", type: "string", value: "" },
+              { name: "ClientId", type: "string", value: "" },
+              { name: "Username", type: "string", value: "" },
+              { name: "Password", type: "string", value: "" },
+              { name: "Port", type: "number", value: 1883 },
+            ],
+          },
+          {
+            id: 12,
+            name: "MqttOut",
+            type: "MqttOut",
+            mode: "Output",
+            parameters: [
+              { name: "Topic", type: "string", value: "" },
+              { name: "Variable", type: "string", value: "" },
+              { name: "Host", type: "string", value: "" },
+              { name: "ClientId", type: "string", value: "" },
+              { name: "Username", type: "string", value: "" },
+              { name: "Password", type: "string", value: "" },
+              { name: "Port", type: "number", value: 1883 },
+            ],
+          },
+        ]);
+
+        const [placedSquares, setPlacedSquares] = React.useState([]);
+        const [placedLines, setPlacedLines] = React.useState([]);
+        const [translucentLines, setTranslucentLines] = React.useState([]);
+        const [placedSegments, setPlacedSegments] = React.useState([]);
+        const [isConnecting, setIsConnecting] = React.useState(false);
+        const [connectionStart, setConnectionStart] = React.useState(null);
+
+        React.useEffect(() => {
+          // load generated JSON from a cookie
+          const cookie = document.cookie
+            .split(";")
+            .find((cookie) => cookie.trim().startsWith("generatedJSON="));
+          if (cookie) {
+            const json = cookie.split("=")[1];
+            const parsed = JSON.parse(json);
+            setPlacedSquares(parsed.components);
+            setPlacedLines(parsed.lines);
+          }
+
+          // load generated JSON from the backend
+          fetch("/download")
+            .then((response) => response.json())
+            .then((data) => {
+              setPlacedSquares(data.real.components);
+              setPlacedLines(data.real.lines);
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+            });
+
+          setPlacedSquares([
+            {
+              id: "3c23e8fe-6913-411d-87da-bb3bf2a73467",
+              name: "Trigger",
+              type: "Trigger",
+              mode: "Input",
+              x: 86,
+              y: 102,
+            },
+            {
+              id: "55f60940-b7de-403a-bdf1-abf90cdc6ce9",
+              name: "LinkOut",
+              type: "LinkOut",
+              mode: "Output",
+              parameters: [
+                {
+                  name: "Target",
+                  type: "string",
+                  value: "1158e0c6-cb09-4c2f-8971-f3e525c36854",
+                },
+              ],
+              x: 235,
+              y: 102,
+            },
+            {
+              id: "ecd56f6c-7833-4120-85af-81c91cc7462a",
+              name: "Logger",
+              type: "Logger",
+              mode: "Output",
+              parameters: [
+                {
+                  name: "Prefix",
+                  type: "string",
+                  value: "",
+                },
+              ],
+              x: 258,
+              y: 220,
+            },
+            {
+              id: "1158e0c6-cb09-4c2f-8971-f3e525c36854",
+              name: "LinkIn",
+              type: "LinkIn",
+              mode: "Input",
+              x: 89,
+              y: 212,
+            },
+          ]);
+          setPlacedLines([
+            {
+              start: "3c23e8fe-6913-411d-87da-bb3bf2a73467",
+              end: "55f60940-b7de-403a-bdf1-abf90cdc6ce9",
+            },
+            {
+              start: "1158e0c6-cb09-4c2f-8971-f3e525c36854",
+              end: "ecd56f6c-7833-4120-85af-81c91cc7462a",
+            },
+          ]);
+        }, []);
+
+        React.useEffect(() => {
+          const linksIn = placedSquares.filter(
+            (square) => square.type === "LinkIn"
+          );
+          const linksOut = placedSquares.filter(
+            (square) => square.type === "LinkOut"
+          );
+          setTranslucentLines(
+            linksIn.map((linkIn) => {
+              const linkOut = linksOut.find(
+                (square) => linkIn.id === square.parameters[0].value
+              );
+              return {
+                start: linkOut.id,
+                end: linkIn.id,
+              };
+            })
+          );
+        }, [placedSquares]);
+
+        function handleDrop(event) {
+          event.preventDefault();
+          const data = event.dataTransfer.getData("text");
+          const dropzone = event.target;
+          const rect = dropzone.getBoundingClientRect();
+          const x = event.clientX - rect.left;
+          const y = event.clientY - rect.top;
+          const newId = generateUUID();
+
+          setPlacedSquares((prevSquares) => [
+            ...prevSquares,
+            {
+              ...cards.find((card) => card.id === parseInt(data)),
+              id: newId,
+              x,
+              y,
+            },
+          ]);
+        }
+
+        function handleDragStart(event, cardName) {
+          event.dataTransfer.setData("text", cardName);
+        }
+
+        function Sidebar() {
+          return (
+            <div style={sidebarStyle}>
+              {cards.map((card) => (
+                <div
+                  key={card.id}
+                  style={cardStyle}
+                  draggable
+                  onDragStart={(event) => handleDragStart(event, card.id)}
+                >
+                  {card.name}
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        function compileComponents() {
+          const linksIn = placedSquares.filter(
+            (square) => square.type === "LinkIn"
+          );
+          const linksOut = placedSquares.filter(
+            (square) => square.type === "LinkOut"
+          );
+          const correctedLines = placedLines.map((line) => {
+            if (linksOut.find((link) => link.id === line.end)) {
+              const linkOut = linksOut.find((link) => link.id === line.end);
+              const linkNext = linkOut.parameters[0].value;
+              const lineIn = placedLines.find((l) => l.start === linkNext);
+              return {
+                start: line.start,
+                end: lineIn.end,
+              };
+            } else if (linksIn.find((link) => link.id === line.start)) {
+              const linkIn = linksIn.find((link) => link.id === line.start);
+              const linkOut = linksOut.find(
+                (square) => linkIn.id === square.parameters[0].value
+              );
+              const linkPrev = placedLines.find((l) => l.end === linkOut.id);
+              return {
+                start: linkPrev.start,
+                end: line.end,
+              };
+            } else {
+              return line;
+            }
+          });
+
+          const deddupedLines = correctedLines.filter(
+            (line, index, self) =>
+              index ===
+              self.findIndex(
+                (t) => t.start === line.start && t.end === line.end
+              )
+          );
+
+          const cleanedSquares = placedSquares
+            .filter(
+              (square) => square.type !== "LinkIn" && square.type !== "LinkOut"
+            )
+            .map((square) => {
+              return {
+                id: square.id,
+                name: square.name,
+                type: square.type,
+                parameters: square.parameters,
+              };
+            });
+
+          // save generated JSON, it is used for the backend
+          setGeneratedJSON(
+            JSON.stringify(
+              { components: cleanedSquares, lines: deddupedLines },
+              null,
+              2
+            )
+          );
+
+          setRealJSON(
+            JSON.stringify(
+              { components: placedSquares, lines: placedLines },
+              null,
+              2
+            )
+          );
+
+          // send generated JSON to the backend
+          fetch("/upload", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              generated: {
+                components: cleanedSquares,
+                lines: deddupedLines,
+              },
+              real: {
+                components: placedSquares,
+                lines: placedLines,
+              },
+            }),
+          })
+            .then((response) => response.json())
+            .then((data) => {
+              console.log("Success:", data);
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+            });
+
+          // save generated JSON to a cookie for GUI
+          document.cookie = `generatedJSON=${JSON.stringify(
+            { components: placedSquares, lines: placedLines },
+            null,
+            2
+          )}`;
+        }
+
+        return (
+          <div style={{ display: "flex" }}>
+            <Sidebar />
+            <div style={{ marginLeft: "220px", padding: "10px", flexGrow: 1 }}>
+              <div
+                id="dropzone"
+                style={{
+                  position: "relative",
+                  width: "100%",
+                  height: "90vh",
+                  border: "1px solid #ccc",
+                  minHeight: "400px",
+                  backgroundColor: "#eaeaea",
+                }}
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+              >
+                <div
+                  style={{
+                    position: "absolute",
+                    width: "100%",
+                    height: "100%",
+                  }}
+                  onClick={() => setSelectedSquare(null)}
+                ></div>
+                {translucentLines &&
+                  translucentLines.map((line, index) => {
+                    const startComponent = placedSquares.find(
+                      (square) => square.id === line.start
+                    );
+                    const endComponent = placedSquares.find(
+                      (square) => square.id === line.end
+                    );
+                    return (
+                      <TranslucentLineComponent
+                        key={index}
+                        start={startComponent}
+                        end={endComponent}
+                      />
+                    );
+                  })}
+                {placedLines &&
+                  placedLines.map((line, index) => {
+                    const startComponent = placedSquares.find(
+                      (square) => square.id === line.start
+                    );
+                    const endComponent = placedSquares.find(
+                      (square) => square.id === line.end
+                    );
+                    return (
+                      <LineComponent
+                        key={index}
+                        start={startComponent}
+                        end={endComponent}
+                        deleteLine={() => {
+                          setPlacedLines((prevLines) =>
+                            prevLines.filter((l) => l !== line)
+                          );
+                        }}
+                      />
+                    );
+                  })}
+                {placedSquares.map((square, index) => (
+                  <SquareComponent
+                    key={index}
+                    positionChange={(newPosition) => {
+                      setPlacedSquares((prevSquares) =>
+                        prevSquares.map((s, i) =>
+                          i === index ? { ...s, ...newPosition } : s
+                        )
+                      );
+                    }}
+                    onCircleClick={(id, type) => {
+                      if (type === "output") {
+                        setIsConnecting(true);
+                        setConnectionStart(id);
+                      } else {
+                        if (isConnecting && connectionStart != id) {
+                          setPlacedLines((prevLines) => [
+                            ...prevLines,
+                            { start: connectionStart, end: id },
+                          ]);
+                          setIsConnecting(false);
+                        }
+                      }
+                    }}
+                    onSquareClick={handleSquareClick}
+                    isConnectionStart={
+                      isConnecting && connectionStart == square.id
+                    }
+                    isSeleteced={
+                      selectedSquare && selectedSquare.id === square.id
+                    }
+                    properties={square}
+                    style={{
+                      position: "absolute",
+                      left: `${square.x}px`,
+                      top: `${square.y}px`,
+                    }}
+                  />
+                ))}
+              </div>
+              <input
+                type="button"
+                onClick={() => compileComponents()}
+                value="Generate JSON"
+              ></input>
+              <div style={{ display: "flex", flexDirection: "row" }}>
+                <pre>{generatedJSON}</pre>
+                <pre>{realJSON}</pre>
+              </div>
+            </div>
+            <RightSidebar
+              selectedSquare={selectedSquare}
+              handleNameChange={handleNameChange}
+              handlePropertyChange={handlePropertyChange}
+              handleDeleteSquare={() => {
+                setPlacedLines((prevLines) =>
+                  prevLines.filter(
+                    (line) =>
+                      line.start !== selectedSquare.id &&
+                      line.end !== selectedSquare.id
+                  )
+                );
+                setPlacedSquares((prevSquares) =>
+                  prevSquares.filter((square) => square !== selectedSquare)
+                );
+              }}
+            />
+          </div>
+        );
+      }
+
+      ReactDOM.render(<App />, document.getElementById("root"));
+    </script>
+  </body>
+</html>
