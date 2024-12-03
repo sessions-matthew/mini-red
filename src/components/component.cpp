@@ -61,11 +61,11 @@ void InputComponent::addOutput(OutputComponent *newOutput) {
 }
 
 void InputComponent::removeOutput(OutputComponent *output) {
-  outputs.erase(
-      remove_if(outputs.begin(), outputs.end(), [&output](OutputComponent *a) {
-        return output->getId() == a->getId();
-      }),
-      outputs.end());
+  outputs.erase(remove_if(outputs.begin(), outputs.end(),
+                          [&output](OutputComponent *a) {
+                            return output->getId() == a->getId();
+                          }),
+                outputs.end());
 }
 
 ComponentOutputs InputComponent::getOutputs() const { return outputs; }
@@ -79,16 +79,20 @@ Trigger::Trigger(string id) : Component(id) { printf("Trigger created\n"); }
 Trigger::~Trigger() { printf("Trigger destroyed\n"); }
 
 int Trigger::process() {
-  auto outputs = getOutputs();
-  ComponentData data;
-  data["a"] = "1";
-  data["b"] = "2";
-  data["payload"] = "Hello, world!";
-  data["topic"] = "test";
-
-  for (auto output : outputs) {
-    output->inputFunction(data);
+  if (lastTime == 0) {
+    lastTime = time(nullptr);
   }
-
+  if (time(nullptr) - lastTime > 1) {
+    lastTime = time(nullptr);
+    ComponentData data;
+    data["a"] = "1";
+    data["b"] = "2";
+    data["payload"] = "Hello, world!";
+    data["topic"] = "test";
+    for (auto output : getOutputs()) {
+      output->inputFunction(data);
+    }
+    return 1;
+  }
   return 0;
 }

@@ -66,6 +66,7 @@ public:
 
 // Trigger creates an event at every cycle
 class Trigger : public InputComponent {
+  unsigned long lastTime;
 public:
   Trigger(string id);
   ~Trigger();

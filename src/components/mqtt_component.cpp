@@ -38,7 +38,8 @@ void MqttInputComponent::init(string host, int port, string client_id,
 
 int MqttInputComponent::process() {
   data_queue_mutex.lock();
-  while (!data_queue.empty()) {
+  const int msgs = data_queue.size() ? 1 : 0;
+  if (!data_queue.empty()) {
     auto data = data_queue.front();
     data_queue.pop();
     data_queue_mutex.unlock();
@@ -48,7 +49,7 @@ int MqttInputComponent::process() {
     data_queue_mutex.lock();
   }
   data_queue_mutex.unlock();
-  return 0;
+  return msgs;
 }
 
 MqttInputComponent::~MqttInputComponent() {

@@ -126,11 +126,13 @@ int main() {
 
   cout << ">>> Main loop starting" << endl;
   for (;;) {
+    int msgs = 0;
     for (auto processor : processors) {
-      processor();
+      msgs += processor();
     }
-    cout << ">>> Main loop sleeping" << endl;
-    sleep(1);
+    if (msgs == 0) {
+      usleep(100000);
+    }
   }
 
   return 0;
