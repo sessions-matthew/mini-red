@@ -16,6 +16,7 @@
         "regex": "cpp",
         "scoped_allocator": "cpp",
         "tuple": "cpp",
-        "vector": "cpp"
+        "vector": "cpp",
+        "ostream": "cpp"
     }
 }

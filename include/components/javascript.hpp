@@ -12,6 +12,16 @@ public:
   ~JavascriptComponent();
 };
 
+class JavascriptCode : public ComplexComponent, public JavascriptComponent {
+public:
+  JavascriptCode(string id);
+  ~JavascriptCode();
+
+  int init(string code);
+  int inputFunction(ComponentData d);
+  int process();
+};
+
 class JavascriptSetter : public Setter, public JavascriptComponent {
 public:
   JavascriptSetter(string id, string newVar, string newVal);

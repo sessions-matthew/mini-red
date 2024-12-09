@@ -83,6 +83,8 @@ int Trigger::process() {
     lastTime = time(nullptr);
   }
   if (time(nullptr) - lastTime > 1) {
+    cout << "Triggering" << endl;
+
     lastTime = time(nullptr);
     ComponentData data;
     data["a"] = "1";
@@ -90,6 +92,7 @@ int Trigger::process() {
     data["payload"] = "Hello, world!";
     data["topic"] = "test";
     for (auto output : getOutputs()) {
+      cout << "Sending data to " << output->getId() << endl;
       output->inputFunction(data);
     }
     return 1;

@@ -45,9 +45,7 @@ int JavascriptSetter::inputFunction(ComponentData d) {
   return 0;
 }
 
-Router::Router(string id) : Component(id) {
-  printf("Router created\n");
-}
+Router::Router(string id) : Component(id) { printf("Router created\n"); }
 
 Router::~Router() { printf("Router destroyed\n"); }
 
@@ -86,3 +84,68 @@ int Router::init(vector<string> conditions, vector<OutputComponent *> routes) {
 }
 
 int Router::process() { return 0; }
+
+JavascriptCode::JavascriptCode(string id) : Component(id) {
+  printf("JavascriptCode created\n");
+}
+
+JavascriptCode::~JavascriptCode() { printf("JavascriptCode destroyed\n"); }
+
+int JavascriptCode::init(string code) {
+  cout << "Initializing javascript code" << endl;
+  string function = "function process (msg) { " + code + "; return msg; }";
+  cout << "Function: " << function << endl;
+  duk_eval_string(ctx, function.c_str());
+  return 0;
+}
+
+int JavascriptCode::inputFunction(ComponentData d) {
+  ComponentData e;
+
+  // call duktape function process
+  duk_get_global_string(ctx, "process");
+  duk_push_object(ctx);
+  for (const auto &pair : d) {
+    duk_push_string(ctx, pair.second.c_str());
+    duk_put_prop_string(ctx, -2, pair.first.c_str());
+  }
+
+  // check for errors
+  if (duk_is_error(ctx, -1)) {
+    cerr << "Error: " << duk_safe_to_string(ctx, -1) << endl;
+    return 1;
+  }
+
+  duk_call(ctx, 1);
+
+  // check for errors
+  if (duk_is_error(ctx, -1)) {
+    cerr << "Error: " << duk_safe_to_string(ctx, -1) << endl;
+    return 1;
+  }
+
+  if (!duk_is_object(ctx, -1)) {
+    cerr << "Error: process function did not return an object" << endl;
+    return 1;
+  }
+
+  duk_enum(ctx, -1, DUK_ENUM_OWN_PROPERTIES_ONLY);
+
+  while (duk_next(ctx, -1, 1)) {
+    const char *key = duk_get_string(ctx, -2);
+    const char *value = duk_safe_to_string(ctx, -1);
+    e[key] = value;
+    duk_pop_2(ctx);
+  }
+
+  for (auto [k, v] : e) {
+    d[k] = v;
+  }
+
+  for (auto output : getOutputs()) {
+    output->inputFunction(d);
+  }
+  return 0;
+}
+
+int JavascriptCode::process() { return 0; }

@@ -108,6 +108,13 @@ const cards = [
       { name: "Port", type: "number", value: 1883 },
     ],
   },
+  {
+    id: 13,
+    name: "Note",
+    type: "Note",
+    mode: "None",
+    parameters: []
+  }
 ];
 
 

@@ -63,6 +63,7 @@ int main() {
   cout << "Lines found" << endl;
 
   for (auto &component : components) {
+    cout << "===============================" << endl;
     string id = component["id"];
     string type = component["type"];
     map<string, Parameter> parameters;
@@ -77,6 +78,7 @@ int main() {
     if (type == "Trigger") {
       Trigger *trigger = new Trigger(id);
       componentsById[id] = trigger;
+      cout << "Address: " << trigger << endl;
       processors.push_back(bind(&Trigger::process, trigger));
     } else if (type == "Logger") {
       string prefix = "";
@@ -107,10 +109,21 @@ int main() {
       componentsById[id] = mqttOutput;
       mqttOutput->init(host, port, clientId, username, password);
       processors.push_back(bind(&MqttOutputComponent::process, mqttOutput));
+    } else if (type == "Script") {
+      string code = parameters["Expression"].valueStr;
+      JavascriptCode *script = new JavascriptCode(id);
+      componentsById[id] = script;
+      cout << "Initializing script with:" << code << endl;
+      cout << "Script: " << script->getId() << endl;
+      cout << "ID: " << id << endl;
+      cout << "Address: " << script << endl;
+      script->init(code);
+      processors.push_back(bind(&JavascriptCode::process, script));
     }
   }
 
   for (auto &line : lines.get<vector<Line>>()) {
+    cout << "= = = = = = = = = = = = = = = " << endl;
     cout << "Connecting " << line.start << " to " << line.end << endl;
     if (componentsById.find(line.start) != componentsById.end() &&
         componentsById.find(line.end) != componentsById.end()) {
@@ -118,9 +131,14 @@ int main() {
           dynamic_cast<InputComponent *>(componentsById[line.start]);
       auto outputComponent =
           dynamic_cast<OutputComponent *>(componentsById[line.end]);
-      if (inputComponent && outputComponent) {
+      if (inputComponent != nullptr && outputComponent != nullptr) {
         inputComponent->addOutput(outputComponent);
+      } else {
+        cout << "Component not found for: " << line.start << " to " << line.end
+             << endl;
       }
+    } else {
+      cout << "Component not found" << endl;
     }
   }
 

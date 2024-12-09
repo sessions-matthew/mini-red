@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ReactJS WebApp</title>
+    <script src="react.development.js" crossorigin></script>
+    <script src="react-dom.development.js" crossorigin></script>
+    <script src="babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mxgraph@4.2.2/javascript/mxClient.min.js"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/mxgraph@4.2.2/javascript/src/css/common.min.css"
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="defn.js"></script>
+    <script type="text/babel">
+      function generateUUID() {
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+          /[xy]/g,
+          function (c) {
+            const r = (Math.random() * 16) | 0,
+              v = c === "x" ? r : (r & 0x3) | 0x8;
+            return v.toString(16);
+          }
+        );
+      }
+
+      function ParameterInput({ param, handleParamChange }) {
+        const [value, setValue] = React.useState(param.value);
+        return (
+          <div>
+            <strong>{param.name}:</strong>
+            <input
+              type={param.type}
+              value={value}
+              onChange={(e) => {
+                setValue(e.target.value);
+                handleParamChange(param.name, e.target.value);
+              }}
+            />
+          </div>
+        );
+      }
+
+      function LeftSidebar({ cards, addComponentNode }) {
+        return (
+          <div style={leftSidebarStyle}>
+            {cards.map((card) => (
+              <div
+                key={card.id}
+                style={cardStyle}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("card", JSON.stringify(card));
+                }}
+                onClick={() => {
+                  console.log(card);
+                  addComponentNode({
+                    id: generateUUID(),
+                    name: card.name,
+                    type: card.type,
+                    mode: card.mode,
+                    x: 0,
+                    y: 0,
+                    parameters: card.parameters,
+                  });
+                }}
+              >
+                {card.name}
+              </div>
+            ))}
+          </div>
+        );
+      }
+
+      function RightSidebar({
+        selectedNode,
+        handlePropertyChange,
+        handleNameChange,
+        handleDeleteSquare,
+      }) {
+        if (!selectedNode) return null;
+
+        const [name, setName] = React.useState();
+
+        React.useEffect(() => {
+          setName(selectedNode.name);
+        }, [selectedNode]);
+
+        return (
+          <div style={rightSidebarStyle}>
+            <h3>Properties</h3>
+            <label>
+              Name:
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  handleNameChange(selectedNode.id, e.target.value);
+                }}
+              />
+            </label>
+            {selectedNode.parameters &&
+              selectedNode.parameters.map((param, index) => (
+                <ParameterInput
+                  key={selectedNode.id + index}
+                  param={param}
+                  selectedNode={selectedNode}
+                  handleParamChange={(name, value) =>
+                    handlePropertyChange(selectedNode.id, name, value)
+                  }
+                />
+              ))}
+            <p>ID: {selectedNode.id}</p>
+            <button onClick={handleDeleteSquare}>Delete</button>
+          </div>
+        );
+      }
+
+      function GraphElement() {
+        const children = React.Children.toArray(this.props.children);
+        return (
+          <div
+            style={{
+              width: "100px",
+              height: "100px",
+              border: "1px solid black",
+            }}
+          >
+            {children}
+          </div>
+        );
+      }
+
+      function Graph({
+        nodes,
+        lines,
+        onLineAdded,
+        onDrop,
+        setNodes,
+        setLines,
+        onNodeSelected,
+      }) {
+        const containerRef = React.useRef(null);
+        const graphRef = React.useRef(null);
+        const [needUpdate, setNeedUpdate] = React.useState(false);
+        const [internalNodes, setInternalNodes] = React.useState([]);
+        const [internalLines, setInternalLines] = React.useState([]);
+
+        const getNodes = () => {
+          return nodes.map((n) => ({ id: n.id, name: n.name, x: n.x, y: n.y }));
+        };
+        const getLines = () => {
+          return lines.map((l) => ({ id: l.id, start: l.start, end: l.end }));
+        };
+        const requestUpdate = () => {
+          setNeedUpdate(true);
+        };
+
+        React.useEffect(() => {
+          if (needUpdate == false) {
+            console.log("No need to update");
+            return;
+          }
+
+          const graph = graphRef.current;
+          if (!graph) console.log("No graph");
+          if (!graph) return;
+          // get nodes from graph
+          const cells = graph.getChildVertices(graph.getDefaultParent());
+          const nodesFromGraph = cells.map((cell) => ({
+            id: cell.id,
+            name: cell.value,
+            x: cell.geometry.x,
+            y: cell.geometry.y,
+            parameters: cell.parameters || [],
+            vertex: cell,
+          }));
+
+          // get lines from graph
+          const edges = graph.getChildEdges(graph.getDefaultParent());
+          let linesFromGraph = edges.map((edge) => ({
+            id: edge.id,
+            start: edge?.source?.id,
+            end: edge?.target?.id,
+            vertex: edge,
+          }));
+
+          console.log(">>>Nodes from graph", nodesFromGraph);
+          console.log(">>>", nodes);
+
+          nodesFromGraph.forEach((node) => {
+            // if node is not in nodes remove it
+            const existingNode = nodes.find((n) => n.id === node.id);
+            if (!existingNode) {
+              console.log("Removing node", node);
+              graph.getModel().remove(node.vertex);
+            }
+          });
+
+          console.log(">>>Lines from graph", linesFromGraph);
+          console.log(">>>", lines);
+
+          // remove duplicate lines that are in linesFromGraph
+          linesFromGraph.forEach((line) => {
+            // get count of how many lines have the same start and end as this line
+            const count = linesFromGraph.filter(
+              (l) => l.start === line.start && l.end === line.end
+            ).length;
+            // if count is more than 1, remove the line
+            if (count > 1) {
+              console.log("Removing line", line);
+              graph.getModel().remove(line.vertex);
+            }
+          });
+
+          setLines(
+            linesFromGraph.map((l) => ({
+              id: l.id,
+              start: l.start,
+              end: l.end,
+            }))
+          );
+
+          setNeedUpdate(false);
+        }, [needUpdate]);
+
+        React.useEffect(() => {
+          const container = containerRef.current;
+          const graph = new mxGraph(container);
+
+          // Keep graph reference for later use
+          graphRef.current = graph;
+
+          // Configure graph
+          graph.setPanning(true);
+          graph.setTooltips(true);
+          graph.setConnectable(true);
+          graph.setEnabled(true);
+
+          // Listen for node movement
+          graph.addListener(mxEvent.MOVE_CELLS, function (sender, evt) {
+            requestUpdate();
+          });
+          graph.addListener(mxEvent.CELL_CONNECTED, function (sender, evt) {
+            requestUpdate();
+          });
+          graph.addListener(mxEvent.CLICK, function (sender, evt) {
+            const cell = evt.getProperty("cell");
+            if (cell && cell.vertex) {
+              onNodeSelected(cell.id);
+            }
+          });
+        }, []);
+
+        React.useEffect(() => {
+          let shouldUpdate = false;
+          const graph = graphRef.current;
+
+          // Add new nodes
+          nodes.forEach((node) => {
+            if (!internalNodes.some((n) => n.id === node.id)) {
+              const parent = graphRef.current.getDefaultParent();
+              graphRef.current.getModel().beginUpdate();
+              try {
+                const vertex = graphRef.current.insertVertex(
+                  parent,
+                  node.id,
+                  node.name,
+                  node.x,
+                  node.y,
+                  80,
+                  30
+                );
+                node.vertex = vertex;
+              } finally {
+                graphRef.current.getModel().endUpdate();
+              }
+              shouldUpdate = true;
+            }
+          });
+
+          if (nodes.length != internalNodes.length) {
+            shouldUpdate = true;
+          }
+
+          if (shouldUpdate) {
+            setInternalNodes(nodes);
+            requestUpdate();
+          }
+        }, [nodes]);
+
+        return (
+          <div
+            onDrop={onDrop}
+            onDragOver={(e) => e.preventDefault()}
+            ref={containerRef}
+            style={{
+              width: "100%",
+              height: "80dvh",
+              border: "1px solid black",
+            }}
+          ></div>
+        );
+      }
+
+      function App() {
+        const [componentNodes, setComponentNodes] = React.useState([]);
+        const [componentLines, setComponentLines] = React.useState([]);
+        const [selectedNode, setSelectedNode] = React.useState(null);
+
+        function addComponentNode(node) {
+          console.log("Adding node", node);
+          setComponentNodes((prevNodes) => [...prevNodes, node]);
+        }
+
+        function addComponentLine(line) {
+          setComponentLines((prevLines) => [...prevLines, line]);
+        }
+
+        function handleNameChange(id, newName) {
+          setComponentNodes((prevSquares) =>
+            prevSquares.map((square) =>
+              square.id === id ? { ...square, name: newName } : square
+            )
+          );
+        }
+
+        function handlePropertyChange(id, paramName, newValue) {
+          setComponentNodes((prevSquares) =>
+            prevSquares.map((square) =>
+              square.id === id
+                ? {
+                    ...square,
+                    parameters: square.parameters.map((param) =>
+                      param.name === paramName
+                        ? { ...param, value: newValue }
+                        : param
+                    ),
+                  }
+                : square
+            )
+          );
+        }
+
+        function compileComponents() {
+          console.log("Compiling components");
+
+          const cleanedNodes = componentNodes.map((node) => ({
+            id: node.id,
+            name: node.name,
+            type: node.type,
+            mode: node.mode,
+            x: node.x,
+            y: node.y,
+            parameters: node.parameters,
+          }));
+
+          const cleanedLines = componentLines.map((line) => ({
+            id: line.id,
+            start: line.start,
+            end: line.end,
+          }));
+
+          // get list of nodes without type of linkOut or linkIn
+          const basicNodes = cleanedNodes.filter(
+            (node) => node.type !== "LinkOut" && node.type !== "LinkIn"
+          );
+
+          // get list of nodes with type of linkOut or linkIn
+          const linkNodes = cleanedNodes.filter(
+            (node) => node.type === "LinkOut" || node.type === "LinkIn"
+          );
+
+          const compiledNodes = basicNodes;
+
+          const compiledLines = cleanedLines.map((line) => {
+            const link = linkNodes.find((linkNode) => linkNode.id === line.end);
+            const target = link?.parameters.find(
+              (param) => param.name === "Target"
+            );
+            const targetLink = linkNodes.find(
+              (linkNode) => linkNode.id === target?.value
+            );
+            const targetLinkTargets = cleanedLines.filter(
+              (line) => line.start === targetLink?.id
+            );
+            return targetLinkTargets.map((targetLinkTarget) => ({
+              id: generateUUID(),
+              start: line.start,
+              end: targetLinkTarget.end,
+            }));
+          });
+
+          // send generated JSON to the backend
+          fetch("/upload", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              generated: {
+                components: compiledNodes,
+                lines: compiledLines,
+              },
+              real: {
+                components: cleanedNodes,
+                lines: cleanedLines,
+              },
+            }),
+          })
+            .then((response) => response)
+            .then((data) => {
+              console.log("Success:", data);
+            })
+            .catch((error) => {
+              console.error("Error:", error);
+            });
+        }
+
+        return (
+          <div style={{ display: "flex" }}>
+            <LeftSidebar cards={cards} addComponentNode={addComponentNode} />
+            <div style={{ marginLeft: "220px", padding: "10px", flexGrow: 1 }}>
+              <Graph
+                nodes={componentNodes}
+                setNodes={setComponentNodes}
+                lines={componentLines}
+                setLines={setComponentLines}
+                onLineAdded={addComponentLine}
+                onNodeSelected={setSelectedNode}
+                onDrop={(e) => {
+                  console.log("Drop", e);
+                  const card = JSON.parse(e.dataTransfer.getData("card"));
+                  const rect = e.target.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const y = e.clientY - rect.top;
+                  addComponentNode({
+                    id: generateUUID(),
+                    name: card.name,
+                    type: card.type,
+                    mode: card.mode,
+                    x: x,
+                    y: y,
+                    parameters: card.parameters,
+                  });
+                }}
+              />
+              <input
+                type="button"
+                onClick={() => {
+                  compileComponents();
+                }}
+                value="Upload"
+              ></input>
+              <div>
+                Nodes:
+                {JSON.stringify(
+                  componentNodes.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    type: c.type,
+                    mode: c.mode,
+                    x: c.x,
+                    y: c.y,
+                    parameters: c.parameters,
+                  }))
+                )}
+              </div>
+              <div>
+                Lines:
+                {JSON.stringify(componentLines)}
+              </div>
+            </div>
+            <RightSidebar
+              selectedNode={componentNodes.find(
+                (node) => node.id === selectedNode
+              )}
+              handleNameChange={handleNameChange}
+              handlePropertyChange={handlePropertyChange}
+              handleDeleteSquare={() => {
+                setComponentNodes((prevNodes) =>
+                  prevNodes.filter((node) => node.id !== selectedNode)
+                );
+                setComponentLines((prevLines) =>
+                  prevLines.filter(
+                    (line) =>
+                      line.start !== selectedNode && line.end !== selectedNode
+                  )
+                );
+                setSelectedNode(null);
+              }}
+            />
+          </div>
+        );
+      }
+
+      ReactDOM.render(<App />, document.getElementById("root"));
+    </script>
+  </body>
+</html>
