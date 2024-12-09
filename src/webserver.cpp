@@ -32,6 +32,7 @@ int main() {
   });
 
   svr.Post("/upload", [](const httplib::Request &req, httplib::Response &res) {
+    cout << req.body << endl;
     ofstream file("program.json");
     if (file.is_open()) {
       file << req.body;
