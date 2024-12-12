@@ -80,3 +80,4 @@ public:
 #include "components/javascript.hpp"
 #include "components/string.hpp"
 #include "components/mqtt_component.hpp"
+#include "components/ble_component.hpp"

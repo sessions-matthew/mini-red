@@ -1,5 +1,5 @@
 {
-    "C_Cpp.default.compileCommands": "/Users/matthewsessions/mini-red/builddir/compile_commands.json",
+    "C_Cpp.default.compileCommands": "/Users/matthewsessions/Projects/mini-red/builddir/compile_commands.json",
     "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild",
     "files.associations": {
         "map": "cpp",
@@ -17,6 +17,8 @@
         "scoped_allocator": "cpp",
         "tuple": "cpp",
         "vector": "cpp",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "fstream": "cpp",
+        "string": "cpp"
     }
 }

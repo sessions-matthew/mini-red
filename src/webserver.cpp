@@ -1,15 +1,19 @@
 #include "httplib.h"
+#include <csignal>
+#include <cstdlib>
+#include <fstream>
 #include <functional>
 #include <stdio.h>
-#include <fstream>
 
 httplib::Server svr;
 
 using std::cout;
 using std::endl;
-using std::ofstream;
 using std::ifstream;
+using std::ofstream;
 using std::string;
+
+pid_t pid = -1;
 
 int main() {
   printf("Hello, Meson!\n");
@@ -41,6 +45,43 @@ int main() {
     } else {
       res.status = 500;
       res.set_content("Failed to open file", "text/plain");
+    }
+  });
+
+  svr.Get("/start", [](const httplib::Request &, httplib::Response &res) {
+    if (pid == -1) {
+      pid = fork();
+      if (pid == 0) {
+        execlp("./builddir/my_executable", "./my_executable", nullptr);
+        exit(0);
+      }
+      // check that fork succeeded
+      if (pid == -1) {
+        res.status = 500;
+        res.set_content("{\"running\":false}", "text/plain");
+      } else {
+        res.set_content("{\"running\":true}", "text/plain");
+      }
+    } else {
+      res.set_content("{\"running\":true}", "text/plain");
+    }
+  });
+
+  svr.Get("/stop", [](const httplib::Request &, httplib::Response &res) {
+    if (pid != -1) {
+      kill(pid, SIGTERM);
+      pid = -1;
+      res.set_content("{\"running\":false}", "text/plain");
+    } else {
+      res.set_content("{\"running\":false}", "text/plain");
+    }
+  });
+
+  svr.Get("/status", [](const httplib::Request &, httplib::Response &res) {
+    if (pid != -1) {
+      res.set_content("{\"running\":true}", "text/plain");
+    } else {
+      res.set_content("{\"running\":false}", "text/plain");
     }
   });
 

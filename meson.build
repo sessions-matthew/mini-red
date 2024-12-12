@@ -18,7 +18,8 @@ executable(
     'src/components/math.cpp',
     'src/components/setter.cpp',
     'src/components/string.cpp',
-    'src/components/mqtt_component.cpp'
+    'src/components/mqtt_component.cpp',
+    'src/components/ble_component.cpp',
   ],
   include_directories: incdir,
 )

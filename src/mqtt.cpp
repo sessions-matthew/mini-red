@@ -244,6 +244,7 @@ void subscribe(boost::asio::ip::tcp::socket &socket, string topic, uint8_t qos,
     for (int i = 0; i < buffer_size; i++) {
       cout << " " << (unsigned int)control_packet[i];
     }
+
     cout << endl;
   }
 

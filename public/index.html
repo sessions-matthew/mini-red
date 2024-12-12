@@ -1,702 +1,787 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ReactJS WebApp</title>
-    <script src="react.development.js" crossorigin></script>
-    <script src="react-dom.development.js" crossorigin></script>
-    <script src="babel.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mxgraph@4.2.2/javascript/mxClient.min.js"></script>
-    <link
-      rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/mxgraph@4.2.2/javascript/src/css/common.min.css"
-    />
-    <link rel="stylesheet" href="index.css" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script src="defn.js"></script>
-    <script type="text/babel">
-      function generateUUID() {
-        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-          /[xy]/g,
-          function (c) {
-            const r = (Math.random() * 16) | 0,
-              v = c === "x" ? r : (r & 0x3) | 0x8;
-            return v.toString(16);
-          }
-        );
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReactJS WebApp</title>
+  <script src="react.development.js" crossorigin></script>
+  <script src="react-dom.development.js" crossorigin></script>
+  <script src="babel.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mxgraph@4.2.2/javascript/mxClient.min.js"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mxgraph@4.2.2/javascript/src/css/common.min.css" />
+  <link rel="stylesheet" href="index.css" />
+</head>
+
+<body>
+  <div id="root"></div>
+  <script src="defn.js"></script>
+  <script type="text/babel">
+    function generateUUID() {
+      return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
+        /[xy]/g,
+        function (c) {
+          const r = (Math.random() * 16) | 0,
+            v = c === "x" ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        }
+      );
+    }
+
+    function ParameterInput({ param, handleParamChange }) {
+      const [value, setValue] = React.useState(param.value);
+      return (
+        <div>
+          <strong>{param.name}:</strong>
+          <input
+            type={param.type}
+            value={value}
+            onChange={(e) => {
+              setValue(e.target.value);
+              handleParamChange(param.name, e.target.value);
+            }}
+          />
+        </div>
+      );
+    }
+
+    function LeftSidebar({
+      cards,
+      addComponentNode,
+      compileComponents,
+      uploadStatus,
+    }) {
+      const [isRunning, setIsRunning] = React.useState(false);
+      const [localUploadStatus, setLocalUploadStatus] = React.useState(uploadStatus);
+
+      const checkStatus = () => {
+        fetch("/status")
+          .then((response) => response.json())
+          .then((data) => {
+            setIsRunning(data.running);
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+          });
       }
 
-      function ParameterInput({ param, handleParamChange }) {
-        const [value, setValue] = React.useState(param.value);
-        return (
+      React.useEffect(() => {
+        checkStatus()
+        const interval = setInterval(checkStatus, 5000);
+        return () => clearInterval(interval);
+      }, []);
+
+      React.useEffect(() => {
+        if (isRunning) setLocalUploadStatus('Running')
+        else setLocalUploadStatus('Stopped')
+      }, [isRunning])
+
+      React.useEffect(() => {
+        // set timeout to clear the status after 5 seconds
+        if (uploadStatus) {
+          setLocalUploadStatus(uploadStatus)
+
+          const t = setTimeout(() => {
+            setLocalUploadStatus(isRunning ? 'Running' : 'Stopped')
+          }, 5000)
+
+          return () => clearTimeout(t)
+        }
+      }, [uploadStatus])
+
+      const toggleRunStop = () => {
+        const endpoint = isRunning ? "/stop" : "/start";
+        fetch(endpoint, { method: "GET" })
+          .then((response) => response.json())
+          .then((data) => {
+            setIsRunning(data.running);
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+          });
+      };
+
+      return (
+        <div style={leftSidebarStyle}>
+          {cards.map((card) => (
+            <div
+              key={card.id}
+              style={cardStyle}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("card", JSON.stringify(card));
+              }}
+              onClick={() => {
+                console.log(card);
+                addComponentNode({
+                  id: generateUUID(),
+                  name: card.name,
+                  type: card.type,
+                  mode: card.mode,
+                  x: 0,
+                  y: 0,
+                  parameters: card.parameters,
+                });
+              }}
+            >
+              {card.name}
+            </div>
+          ))}
           <div>
-            <strong>{param.name}:</strong>
+            <div>{localUploadStatus}</div>
+            <div style={{ display: 'flex', flexDirection: 'row' }}>
+              <input
+                type="button"
+                style={{ width: "100%", padding: "10px", margin: "10px 0" }}
+                onClick={toggleRunStop}
+                value={isRunning ? "S" : "R"}
+              ></input>
+              <input
+                type="button"
+                style={{ width: "100%", padding: "10px", margin: "10px 0" }}
+                onClick={() => {
+                  compileComponents();
+                }}
+                value="U"
+              ></input>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function RightSidebar({
+      selectedNode,
+      handlePropertyChange,
+      handleNameChange,
+      handleDeleteSquare,
+    }) {
+      if (!selectedNode) return null;
+
+      const [name, setName] = React.useState();
+
+      React.useEffect(() => {
+        setName(selectedNode.name);
+      }, [selectedNode]);
+
+      return (
+        <div style={rightSidebarStyle}>
+          <h3>Properties</h3>
+          <label>
+            Name:
             <input
-              type={param.type}
-              value={value}
+              type="text"
+              value={name}
               onChange={(e) => {
-                setValue(e.target.value);
-                handleParamChange(param.name, e.target.value);
+                setName(e.target.value);
+                handleNameChange(selectedNode.id, e.target.value);
               }}
             />
-          </div>
-        );
-      }
-
-      function LeftSidebar({
-        cards,
-        addComponentNode,
-        compileComponents,
-        uploadStatus,
-      }) {
-        return (
-          <div style={leftSidebarStyle}>
-            {cards.map((card) => (
-              <div
-                key={card.id}
-                style={cardStyle}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("card", JSON.stringify(card));
-                }}
-                onClick={() => {
-                  console.log(card);
-                  addComponentNode({
-                    id: generateUUID(),
-                    name: card.name,
-                    type: card.type,
-                    mode: card.mode,
-                    x: 0,
-                    y: 0,
-                    parameters: card.parameters,
-                  });
-                }}
-              >
-                {card.name}
-              </div>
-            ))}
-            <input
-              type="button"
-              style={{ width: "100%", padding: "10px", margin: "10px 0" }}
-              onClick={() => {
-                compileComponents();
-              }}
-              value="Upload"
-            ></input>
-            <div>{uploadStatus}</div>
-          </div>
-        );
-      }
-
-      function RightSidebar({
-        selectedNode,
-        handlePropertyChange,
-        handleNameChange,
-        handleDeleteSquare,
-      }) {
-        if (!selectedNode) return null;
-
-        const [name, setName] = React.useState();
-
-        React.useEffect(() => {
-          setName(selectedNode.name);
-        }, [selectedNode]);
-
-        return (
-          <div style={rightSidebarStyle}>
-            <h3>Properties</h3>
-            <label>
-              Name:
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  handleNameChange(selectedNode.id, e.target.value);
-                }}
+          </label>
+          {selectedNode.parameters &&
+            selectedNode.parameters.map((param, index) => (
+              <ParameterInput
+                key={selectedNode.id + index}
+                param={param}
+                selectedNode={selectedNode}
+                handleParamChange={(name, value) =>
+                  handlePropertyChange(selectedNode.id, name, value)
+                }
               />
-            </label>
-            {selectedNode.parameters &&
-              selectedNode.parameters.map((param, index) => (
-                <ParameterInput
-                  key={selectedNode.id + index}
-                  param={param}
-                  selectedNode={selectedNode}
-                  handleParamChange={(name, value) =>
-                    handlePropertyChange(selectedNode.id, name, value)
-                  }
-                />
-              ))}
-            <p>ID: {selectedNode.id}</p>
-            <button onClick={handleDeleteSquare}>Delete</button>
-          </div>
-        );
-      }
+            ))}
+          <p>ID: {selectedNode.id}</p>
+          <button onClick={handleDeleteSquare}>Delete</button>
+        </div>
+      );
+    }
 
-      function GraphGroup({ group, nodes, setNodes, setGroups }) {
-        const selfRef = React.useRef(null);
+    function GraphGroup({ group, nodes, setNodes, setGroups }) {
+      const selfRef = React.useRef(null);
 
-        const groupNodes = nodes.filter((node) =>
-          group.nodes.includes(node.id)
-        );
-        const groupRect = groupNodes.reduce(
-          (acc, node) => {
-            return {
-              left: Math.min(acc.left, node.x) - 10,
-              top: Math.min(acc.top, node.y) - 10,
-              right: Math.max(acc.right, node.x + 50) + 10,
-              bottom: Math.max(acc.bottom, node.y + 50),
-            };
-          },
-          {
-            left: Infinity,
-            top: Infinity,
-            right: -Infinity,
-            bottom: -Infinity,
-          }
-        );
-
-        React.useEffect(() => {
-          const element = selfRef.current;
-          let startX, startY, initialX, initialY, groupId;
-
-          const handleMouseMove = (e) => {
-            if (groupId) {
-              const dx = e.clientX - startX;
-              const dy = e.clientY - startY;
-              const newX = initialX + dx;
-              const newY = initialY + dy;
-
-              const left = Math.round(newX / 25) * 25;
-              const top = Math.round(newY / 25) * 25;
-
-              element.style.left = `${left}px`;
-              element.style.top = `${top}px`;
-
-              setNodes((prevNodes) =>
-                prevNodes.map((node) => {
-                  return group.nodes.includes(node.id)
-                    ? {
-                        ...node,
-                        x: Math.round((node.startX + dx) / 25) * 25,
-                        y: Math.round((node.startY + dy) / 25) * 25,
-                      }
-                    : node;
-                })
-              );
-            }
+      const groupNodes = nodes.filter((node) =>
+        group.nodes.includes(node.id)
+      );
+      const groupRect = groupNodes.reduce(
+        (acc, node) => {
+          return {
+            left: Math.min(acc.left, node.x) - 10,
+            top: Math.min(acc.top, node.y) - 10,
+            right: Math.max(acc.right, node.x + 50) + 10,
+            bottom: Math.max(acc.bottom, node.y + 50),
           };
+        },
+        {
+          left: Infinity,
+          top: Infinity,
+          right: -Infinity,
+          bottom: -Infinity,
+        }
+      );
 
-          const handleMouseDown = (e) => {
-            startX = e.clientX;
-            startY = e.clientY;
-            initialX = element.offsetLeft;
-            initialY = element.offsetTop;
-            groupId = group.id;
+      React.useEffect(() => {
+        const element = selfRef.current;
+        let startX, startY, initialX, initialY, groupId;
 
-            selfRef.current.addEventListener("mousemove", handleMouseMove);
-            selfRef.current.addEventListener("mouseup", handleMouseUp);
-
-            setNodes((prevNodes) =>
-              prevNodes.map((node) =>
-                group.nodes.includes(node.id)
-                  ? {
-                      ...node,
-                      startX: Math.round(node.x / 25) * 25,
-                      startY: Math.round(node.y / 25) * 25,
-                    }
-                  : node
-              )
-            );
-          };
-
-          const cleanup = (e) => {
-            selfRef.current.removeEventListener("mousemove", handleMouseMove);
-            selfRef.current.removeEventListener("mouseup", handleMouseUp);
-            selfRef.current.removeEventListener("mouseleave", handleMouseLeave);
-          };
-
-          const handleMouseUp = cleanup;
-          const handleMouseLeave = cleanup;
-
-          selfRef.current.addEventListener("mousedown", handleMouseDown);
-          selfRef.current.addEventListener("mouseleave", handleMouseLeave);
-
-          return () => {
-            selfRef.current.removeEventListener("mousemove", handleMouseMove);
-            selfRef.current.removeEventListener("mouseup", handleMouseUp);
-            selfRef.current.removeEventListener("mousedown", handleMouseDown);
-            selfRef.current.removeEventListener("mouseleave", handleMouseLeave);
-          };
-        }, []);
-
-        const handleDoubleClick = () => {
-          setGroups((prevGroups) =>
-            prevGroups.filter((g) => g.id !== group.id)
-          );
-        };
-
-        return (
-          <div
-            ref={selfRef}
-            key={group.id}
-            onDoubleClick={handleDoubleClick}
-            style={{
-              position: "absolute",
-              left: groupRect.left,
-              top: groupRect.top,
-              width: groupRect.right - groupRect.left,
-              height: groupRect.bottom - groupRect.top,
-              border: "2px dashed blue",
-              pointerEvents: "auto",
-            }}
-          ></div>
-        );
-      }
-
-      function GraphElement({
-        children,
-        style,
-        selected,
-        lineStart,
-        onElementMoved,
-        onElementSelected,
-        onLineStart,
-      }) {
-        const elementRef = React.useRef(null);
-        const [isHovered, setIsHovered] = React.useState(false);
-
-        React.useEffect(() => {
-          const element = elementRef.current;
-          let startX, startY, initialX, initialY;
-
-          const onMouseDown = (e) => {
-            startX = e.clientX;
-            startY = e.clientY;
-            initialX = element.offsetLeft;
-            initialY = element.offsetTop;
-            document.addEventListener("mousemove", onMouseMove);
-            document.addEventListener("mouseup", onMouseUp);
-          };
-
-          const onMouseMove = (e) => {
+        const handleMouseMove = (e) => {
+          if (groupId) {
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
             const newX = initialX + dx;
             const newY = initialY + dy;
-            element.style.left = `${Math.round(newX / 25) * 25}px`;
-            element.style.top = `${Math.round(newY / 25) * 25}px`;
-          };
 
-          const onMouseUp = (e) => {
-            document.removeEventListener("mousemove", onMouseMove);
-            document.removeEventListener("mouseup", onMouseUp);
-            onElementMoved(element.offsetLeft, element.offsetTop);
-          };
+            const left = Math.round(newX / 25) * 25;
+            const top = Math.round(newY / 25) * 25;
 
-          element.addEventListener("mousedown", onMouseDown);
+            element.style.left = `${left}px`;
+            element.style.top = `${top}px`;
 
-          return () => {
-            element.removeEventListener("mousedown", onMouseDown);
-          };
-        }, [onElementMoved]);
-
-        return (
-          <div
-            ref={elementRef}
-            className="unselectable"
-            style={{
-              ...style,
-              position: "absolute",
-              cursor: "move",
-              backgroundColor: selected ? "lightblue" : "white",
-              border: selected ? "2px solid blue" : "1px solid black",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-            onMouseEnter={() => setIsHovered(true)}
-            onMouseLeave={() => setIsHovered(false)}
-            onClick={onElementSelected}
-          >
-            {children}
-            {(isHovered || lineStart) && (
-              <button
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  zIndex: 1,
-                  backgroundColor: lineStart ? "green" : "white",
-                }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onLineStart();
-                }}
-              ></button>
-            )}
-          </div>
-        );
-      }
-
-      function Graph({
-        nodes,
-        lines,
-        groups,
-        onLineAdded,
-        onDrop,
-        setNodes,
-        setLines,
-        setGroups,
-        onNodeSelected,
-        style,
-      }) {
-        const containerRef = React.useRef(null);
-        const graphRef = React.useRef(null);
-        const [needUpdate, setNeedUpdate] = React.useState(false);
-        const [internalNodes, setInternalNodes] = React.useState([]);
-        const [internalLines, setInternalLines] = React.useState([]);
-        const [selectedNode, setSelectedNode] = React.useState(null);
-        const [lineStartNode, setLineStartNode] = React.useState(null);
-
-        const getNodes = () => {
-          return nodes.map((n) => ({ id: n.id, name: n.name, x: n.x, y: n.y }));
-        };
-        const getLines = () => {
-          return lines.map((l) => ({ id: l.id, start: l.start, end: l.end }));
-        };
-        const requestUpdate = () => {
-          setNeedUpdate(true);
-        };
-        function GraphLine({ line, style, onClick }) {
-          // display a line with an arrow in the middle that is clickable
-          const startNode = nodes.find((n) => n.id === line.start);
-          const endNode = nodes.find((n) => n.id === line.end);
-
-          if (!startNode || !endNode) {
-            return null;
+            setNodes((prevNodes) =>
+              prevNodes.map((node) => {
+                return group.nodes.includes(node.id)
+                  ? {
+                    ...node,
+                    x: Math.round((node.startX + dx) / 25) * 25,
+                    y: Math.round((node.startY + dy) / 25) * 25,
+                  }
+                  : node;
+              })
+            );
           }
+        };
 
-          const dx = endNode.x - startNode.x;
-          const dy = endNode.y - startNode.y;
-          const angle = Math.atan2(dy, dx);
-          const length = Math.sqrt(dx * dx + dy * dy);
+        const handleMouseDown = (e) => {
+          startX = e.clientX;
+          startY = e.clientY;
+          initialX = element.offsetLeft;
+          initialY = element.offsetTop;
+          groupId = group.id;
 
-          return (
-            <div
+          selfRef.current.addEventListener("mousemove", handleMouseMove);
+          selfRef.current.addEventListener("mouseup", handleMouseUp);
+
+          setNodes((prevNodes) =>
+            prevNodes.map((node) =>
+              group.nodes.includes(node.id)
+                ? {
+                  ...node,
+                  startX: Math.round(node.x / 25) * 25,
+                  startY: Math.round(node.y / 25) * 25,
+                }
+                : node
+            )
+          );
+        };
+
+        const cleanup = (e) => {
+          selfRef.current.removeEventListener("mousemove", handleMouseMove);
+          selfRef.current.removeEventListener("mouseup", handleMouseUp);
+          selfRef.current.removeEventListener("mouseleave", handleMouseLeave);
+        };
+
+        const handleMouseUp = cleanup;
+        const handleMouseLeave = cleanup;
+
+        selfRef.current.addEventListener("mousedown", handleMouseDown);
+        selfRef.current.addEventListener("mouseleave", handleMouseLeave);
+
+        return () => {
+          selfRef.current.removeEventListener("mousemove", handleMouseMove);
+          selfRef.current.removeEventListener("mouseup", handleMouseUp);
+          selfRef.current.removeEventListener("mousedown", handleMouseDown);
+          selfRef.current.removeEventListener("mouseleave", handleMouseLeave);
+        };
+      }, []);
+
+      const handleDoubleClick = () => {
+        setGroups((prevGroups) =>
+          prevGroups.filter((g) => g.id !== group.id)
+        );
+      };
+
+      return (
+        <div
+          ref={selfRef}
+          key={group.id}
+          onDoubleClick={handleDoubleClick}
+          style={{
+            position: "absolute",
+            left: groupRect.left,
+            top: groupRect.top,
+            width: groupRect.right - groupRect.left,
+            height: groupRect.bottom - groupRect.top,
+            border: "2px dashed blue",
+            pointerEvents: "auto",
+          }}
+        ></div>
+      );
+    }
+
+    function GraphElement({
+      children,
+      style,
+      selected,
+      lineStart,
+      onElementMoved,
+      onElementSelected,
+      onLineStart,
+    }) {
+      const elementRef = React.useRef(null);
+      const [isHovered, setIsHovered] = React.useState(false);
+
+      React.useEffect(() => {
+        const element = elementRef.current;
+        let startX, startY, initialX, initialY;
+
+        const onMouseDown = (e) => {
+          startX = e.clientX;
+          startY = e.clientY;
+          initialX = element.offsetLeft;
+          initialY = element.offsetTop;
+          document.addEventListener("mousemove", onMouseMove);
+          document.addEventListener("mouseup", onMouseUp);
+        };
+
+        const onMouseMove = (e) => {
+          const dx = e.clientX - startX;
+          const dy = e.clientY - startY;
+          const newX = initialX + dx;
+          const newY = initialY + dy;
+          element.style.left = `${Math.round(newX / 25) * 25}px`;
+          element.style.top = `${Math.round(newY / 25) * 25}px`;
+        };
+
+        const onMouseUp = (e) => {
+          document.removeEventListener("mousemove", onMouseMove);
+          document.removeEventListener("mouseup", onMouseUp);
+          onElementMoved(element.offsetLeft, element.offsetTop);
+        };
+
+        element.addEventListener("mousedown", onMouseDown);
+
+        return () => {
+          element.removeEventListener("mousedown", onMouseDown);
+        };
+      }, [onElementMoved]);
+
+      return (
+        <div
+          ref={elementRef}
+          className="unselectable"
+          style={{
+            ...style,
+            position: "absolute",
+            cursor: "move",
+            backgroundColor: selected ? "lightblue" : "white",
+            border: selected ? "2px solid blue" : "1px solid black",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+          onClick={onElementSelected}
+        >
+          {children}
+          {(isHovered || lineStart) && (
+            <button
               style={{
                 position: "absolute",
-                left: startNode.x + 20,
-                top: startNode.y + 7,
-                width: length,
-                height: 2,
-                transform: `rotate(${angle}rad)`,
-                transformOrigin: "0 0",
-                borderBottom: "1px solid black",
-                cursor: "pointer",
-                ...style,
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%)",
+                zIndex: 1,
+                backgroundColor: lineStart ? "green" : "white",
               }}
-              onClick={onClick}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  left: length / 2 - 5,
-                  top: -3,
-                  width: 0,
-                  height: 0,
-                  borderTop: "5px solid transparent",
-                  borderBottom: "5px solid transparent",
-                  borderLeft: "10px solid black",
-                }}
-              ></div>
-            </div>
-          );
+              onClick={(e) => {
+                e.stopPropagation();
+                onLineStart();
+              }}
+            ></button>
+          )}
+        </div>
+      );
+    }
+
+    function Graph({
+      nodes,
+      lines,
+      groups,
+      onLineAdded,
+      onDrop,
+      setNodes,
+      setLines,
+      setGroups,
+      onNodeSelected,
+      style,
+    }) {
+      const containerRef = React.useRef(null);
+      const graphRef = React.useRef(null);
+      const [needUpdate, setNeedUpdate] = React.useState(false);
+      const [internalNodes, setInternalNodes] = React.useState([]);
+      const [internalLines, setInternalLines] = React.useState([]);
+      const [selectedNode, setSelectedNode] = React.useState(null);
+      const [lineStartNode, setLineStartNode] = React.useState(null);
+
+      const getNodes = () => {
+        return nodes.map((n) => ({ id: n.id, name: n.name, x: n.x, y: n.y }));
+      };
+      const getLines = () => {
+        return lines.map((l) => ({ id: l.id, start: l.start, end: l.end }));
+      };
+      const requestUpdate = () => {
+        setNeedUpdate(true);
+      };
+      function GraphLine({ line, style, onClick }) {
+        // display a line with an arrow in the middle that is clickable
+        const startNode = nodes.find((n) => n.id === line.start);
+        const endNode = nodes.find((n) => n.id === line.end);
+
+        if (!startNode || !endNode) {
+          return null;
         }
 
+        const dx = endNode.x - startNode.x;
+        const dy = endNode.y - startNode.y;
+        const angle = Math.atan2(dy, dx);
+        const length = Math.sqrt(dx * dx + dy * dy);
+
         return (
           <div
-            style={{ position: "relative", ...style }}
-            className="unselectable"
-            onDrop={(e) => {
-              if (e.dataTransfer.getData("card")) {
-                onDrop(e);
-              }
-              if (e.dataTransfer.getData("type")) {
-                const t = e.dataTransfer.getData("type");
-                console.log("Type", t);
-                const groupId = e.dataTransfer.getData("groupId");
-                const startX = parseInt(e.dataTransfer.getData("startX"), 10);
-                const startY = parseInt(e.dataTransfer.getData("startY"), 10);
-                const dx = e.clientX - startX;
-                const dy = e.clientY - startY;
-
-                if (t === "movegroup") {
-                  setNodes((prevNodes) =>
-                    prevNodes.map((node) =>
-                      groups
-                        .find((group) => group.id === groupId)
-                        ?.nodes.includes(node.id)
-                        ? { ...node, x: node.x + dx, y: node.y + dy }
-                        : node
-                    )
-                  );
-                }
-              }
+            style={{
+              position: "absolute",
+              left: startNode.x + 20,
+              top: startNode.y + 7,
+              width: length,
+              height: 2,
+              transform: `rotate(${angle}rad)`,
+              transformOrigin: "0 0",
+              borderBottom: "1px solid black",
+              cursor: "pointer",
+              ...style,
             }}
-            onDragOver={(e) => e.preventDefault()}
+            onClick={onClick}
           >
             <div
               style={{
                 position: "absolute",
-                top: 0,
-                left: 0,
-                height: "100%",
-                width: "100%",
-                backgroundSize: "25px 25px",
-                backgroundImage:
-                  "linear-gradient(to right, lightgray 1px, transparent 1px), linear-gradient(to bottom, lightgray 1px, transparent 1px)",
-              }}
-              onMouseDown={(e) => {
-                const startX = e.clientX;
-                const startY = e.clientY;
-                const selectionBox = document.createElement("div");
-                selectionBox.style.position = "absolute";
-                selectionBox.style.border = "1px dashed black";
-                selectionBox.style.backgroundColor = "rgba(0, 0, 255, 0.1)";
-                document.body.appendChild(selectionBox);
-
-                const onMouseMove = (e) => {
-                  const currentX = e.clientX;
-                  const currentY = e.clientY;
-                  selectionBox.style.left = `${
-                    Math.round(Math.min(startX, currentX) / 25) * 25
-                  }px`;
-                  selectionBox.style.top = `${
-                    Math.round(Math.min(startY, currentY) / 25) * 25
-                  }px`;
-                  selectionBox.style.width = `${
-                    Math.round(Math.abs(currentX - startX) / 25) * 25
-                  }px`;
-                  selectionBox.style.height = `${
-                    Math.round(Math.abs(currentY - startY) / 25) * 25
-                  }px`;
-                };
-
-                const onMouseUp = (e) => {
-                  document.removeEventListener("mousemove", onMouseMove);
-                  document.removeEventListener("mouseup", onMouseUp);
-
-                  const rect = selectionBox.getBoundingClientRect();
-                  document.body.removeChild(selectionBox);
-
-                  const selectedNodes = nodes.filter((node) => {
-                    const nodeRect = {
-                      left: node.x + 250,
-                      top: node.y,
-                      right: node.x + 50 + 250,
-                      bottom: node.y + 50,
-                    };
-
-                    return (
-                      nodeRect.left >= rect.left &&
-                      nodeRect.right <= rect.right &&
-                      nodeRect.top >= rect.top &&
-                      nodeRect.bottom <= rect.bottom
-                    );
-                  });
-
-                  if (selectedNodes.length > 0) {
-                    setGroups((prevGroups) => [
-                      ...prevGroups,
-                      {
-                        id: generateUUID(),
-                        nodes: selectedNodes.map((n) => n.id),
-                      },
-                    ]);
-                  }
-
-                  setSelectedNode(null);
-                  setLineStartNode(null);
-                };
-
-                document.addEventListener("mousemove", onMouseMove);
-                document.addEventListener("mouseup", onMouseUp);
-              }}
-              onClick={() => {
-                onNodeSelected(null);
-                setSelectedNode(null);
-                setLineStartNode(null);
+                left: length / 2 - 5,
+                top: -3,
+                width: 0,
+                height: 0,
+                borderTop: "5px solid transparent",
+                borderBottom: "5px solid transparent",
+                borderLeft: "10px solid black",
               }}
             ></div>
-            {groups.map((group) => (
-              <GraphGroup
-                key={group.id}
-                group={group}
-                nodes={nodes}
-                setNodes={setNodes}
-                setGroups={setGroups}
-              />
-            ))}
-            {lines.map((line) => (
-              <GraphLine
-                key={line.id}
-                style={{ backgroundColor: "red" }}
-                line={line}
-                onClick={() => {
-                  console.log("Line clicked", line);
-                  // delete line
-                  setLines((prevLines) =>
-                    prevLines.filter((l) => l.id !== line.id)
-                  );
-                }}
-              />
-            ))}
-            {nodes.map((node) => (
-              <GraphElement
-                key={node.id}
-                selected={selectedNode == node.id}
-                lineStart={lineStartNode == node.id}
-                style={{ position: "absolute", left: node.x, top: node.y }}
-                onElementSelected={() => {
-                  setLineStartNode(null);
-                  setSelectedNode(node.id);
-                  onNodeSelected(node.id);
-                }}
-                onLineStart={() => {
-                  if (lineStartNode) {
-                    onLineAdded({
-                      id: generateUUID(),
-                      start: lineStartNode,
-                      end: node.id,
-                    });
-                    setLineStartNode(null);
-                  }
-
-                  setLineStartNode(node.id);
-                  setSelectedNode(node.id);
-                  onNodeSelected(node.id);
-                }}
-                onElementMoved={(x, y) => {
-                  setNodes((prevNodes) =>
-                    prevNodes.map((n) =>
-                      n.id === node.id ? { ...n, x, y } : n
-                    )
-                  );
-                }}
-              >
-                <div style={{ height: 20 }}>{node.name}</div>
-              </GraphElement>
-            ))}
           </div>
         );
       }
 
-      function App() {
-        const [componentNodes, setComponentNodes] = React.useState([]);
-        const [componentLines, setComponentLines] = React.useState([]);
-        const [componentGroups, setComponentGroups] = React.useState([]);
-        const [selectedNode, setSelectedNode] = React.useState(null);
-        const [uploadStatus, setUploadStatus] = React.useState(null);
-
-        function addComponentNode(node) {
-          console.log("Adding node", node);
-          setComponentNodes((prevNodes) => [...prevNodes, node]);
-        }
-
-        function addComponentLine(line) {
-          setComponentLines((prevLines) => [...prevLines, line]);
-        }
-
-        function handleNameChange(id, newName) {
-          setComponentNodes((prevSquares) =>
-            prevSquares.map((square) =>
-              square.id === id ? { ...square, name: newName } : square
-            )
-          );
-        }
-
-        function handlePropertyChange(id, paramName, newValue) {
-          setComponentNodes((prevSquares) =>
-            prevSquares.map((square) =>
-              square.id === id
-                ? {
-                    ...square,
-                    parameters: square.parameters.map((param) =>
-                      param.name === paramName
-                        ? { ...param, value: newValue }
-                        : param
-                    ),
-                  }
-                : square
-            )
-          );
-        }
-
-        function compileComponents() {
-          console.log("Compiling components");
-
-          const cleanedNodes = componentNodes.map((node) => ({
-            id: node.id,
-            name: node.name,
-            type: node.type,
-            mode: node.mode,
-            x: node.x,
-            y: node.y,
-            parameters: node.parameters,
-          }));
-
-          const cleanedLines = componentLines.map((line) => ({
-            id: line.id,
-            start: line.start,
-            end: line.end,
-          }));
-
-          const cleanedGroups = componentGroups.map((group) => ({
-            id: group.id,
-            nodes: group.nodes,
-          }));
-
-          // get list of nodes without type of linkOut or linkIn
-          const basicNodes = cleanedNodes.filter(
-            (node) => node.type !== "LinkOut" && node.type !== "LinkIn"
-          );
-
-          // get list of nodes with type of linkOut or linkIn
-          const linkNodes = cleanedNodes.filter(
-            (node) => node.type === "LinkOut" || node.type === "LinkIn"
-          );
-
-          const compiledNodes = basicNodes;
-
-          const compiledLines = cleanedLines.map((line) => {
-            const link = linkNodes.find((linkNode) => linkNode.id === line.end);
-            const target = link?.parameters.find(
-              (param) => param.name === "Target"
-            );
-            const targetLink = linkNodes.find(
-              (linkNode) => linkNode.id === target?.value
-            );
-            if (targetLink) {
-              const targetLinkTargets = cleanedLines.filter(
-                (line) => line.start === targetLink?.id
-              );
-              return targetLinkTargets.map((targetLinkTarget) => ({
-                id: generateUUID(),
-                start: line.start,
-                end: targetLinkTarget.end,
-              }));
-            } else {
-              return line;
+      return (
+        <div
+          style={{ position: "relative", ...style }}
+          className="unselectable"
+          onDrop={(e) => {
+            if (e.dataTransfer.getData("card")) {
+              onDrop(e);
             }
-          });
+            if (e.dataTransfer.getData("type")) {
+              const t = e.dataTransfer.getData("type");
+              console.log("Type", t);
+              const groupId = e.dataTransfer.getData("groupId");
+              const startX = parseInt(e.dataTransfer.getData("startX"), 10);
+              const startY = parseInt(e.dataTransfer.getData("startY"), 10);
+              const dx = e.clientX - startX;
+              const dy = e.clientY - startY;
 
-          // send generated JSON to the backend
-          fetch("/upload", {
+              if (t === "movegroup") {
+                setNodes((prevNodes) =>
+                  prevNodes.map((node) =>
+                    groups
+                      .find((group) => group.id === groupId)
+                      ?.nodes.includes(node.id)
+                      ? { ...node, x: node.x + dx, y: node.y + dy }
+                      : node
+                  )
+                );
+              }
+            }
+          }}
+          onDragOver={(e) => e.preventDefault()}
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              height: "100%",
+              width: "100%",
+              backgroundSize: "25px 25px",
+              backgroundImage:
+                "linear-gradient(to right, lightgray 1px, transparent 1px), linear-gradient(to bottom, lightgray 1px, transparent 1px)",
+            }}
+            onMouseDown={(e) => {
+              const startX = e.clientX;
+              const startY = e.clientY;
+              const selectionBox = document.createElement("div");
+              selectionBox.style.position = "absolute";
+              selectionBox.style.border = "1px dashed black";
+              selectionBox.style.backgroundColor = "rgba(0, 0, 255, 0.1)";
+              document.body.appendChild(selectionBox);
+
+              const onMouseMove = (e) => {
+                const currentX = e.clientX;
+                const currentY = e.clientY;
+                selectionBox.style.left = `${Math.round(Math.min(startX, currentX) / 25) * 25
+                  }px`;
+                selectionBox.style.top = `${Math.round(Math.min(startY, currentY) / 25) * 25
+                  }px`;
+                selectionBox.style.width = `${Math.round(Math.abs(currentX - startX) / 25) * 25
+                  }px`;
+                selectionBox.style.height = `${Math.round(Math.abs(currentY - startY) / 25) * 25
+                  }px`;
+              };
+
+              const onMouseUp = (e) => {
+                document.removeEventListener("mousemove", onMouseMove);
+                document.removeEventListener("mouseup", onMouseUp);
+
+                const rect = selectionBox.getBoundingClientRect();
+                document.body.removeChild(selectionBox);
+
+                const selectedNodes = nodes.filter((node) => {
+                  const nodeRect = {
+                    left: node.x + 250,
+                    top: node.y,
+                    right: node.x + 50 + 250,
+                    bottom: node.y + 50,
+                  };
+
+                  return (
+                    nodeRect.left >= rect.left &&
+                    nodeRect.right <= rect.right &&
+                    nodeRect.top >= rect.top &&
+                    nodeRect.bottom <= rect.bottom
+                  );
+                });
+
+                if (selectedNodes.length > 0) {
+                  setGroups((prevGroups) => [
+                    ...prevGroups,
+                    {
+                      id: generateUUID(),
+                      nodes: selectedNodes.map((n) => n.id),
+                    },
+                  ]);
+                }
+
+                setSelectedNode(null);
+                setLineStartNode(null);
+              };
+
+              document.addEventListener("mousemove", onMouseMove);
+              document.addEventListener("mouseup", onMouseUp);
+            }}
+            onClick={() => {
+              onNodeSelected(null);
+              setSelectedNode(null);
+              setLineStartNode(null);
+            }}
+          ></div>
+          {groups.map((group) => (
+            <GraphGroup
+              key={group.id}
+              group={group}
+              nodes={nodes}
+              setNodes={setNodes}
+              setGroups={setGroups}
+            />
+          ))}
+          {lines.map((line) => (
+            <GraphLine
+              key={line.id}
+              style={{ backgroundColor: "red" }}
+              line={line}
+              onClick={() => {
+                console.log("Line clicked", line);
+                // delete line
+                setLines((prevLines) =>
+                  prevLines.filter((l) => l.id !== line.id)
+                );
+              }}
+            />
+          ))}
+          {nodes.map((node) => (
+            <GraphElement
+              key={node.id}
+              selected={selectedNode == node.id}
+              lineStart={lineStartNode == node.id}
+              style={{ position: "absolute", left: node.x, top: node.y }}
+              onElementSelected={() => {
+                setLineStartNode(null);
+                setSelectedNode(node.id);
+                onNodeSelected(node.id);
+              }}
+              onLineStart={() => {
+                if (lineStartNode) {
+                  onLineAdded({
+                    id: generateUUID(),
+                    start: lineStartNode,
+                    end: node.id,
+                  });
+                  setLineStartNode(null);
+                }
+
+                setLineStartNode(node.id);
+                setSelectedNode(node.id);
+                onNodeSelected(node.id);
+              }}
+              onElementMoved={(x, y) => {
+                setNodes((prevNodes) =>
+                  prevNodes.map((n) =>
+                    n.id === node.id ? { ...n, x, y } : n
+                  )
+                );
+              }}
+            >
+              <div style={{ height: 20 }}>{node.name}</div>
+            </GraphElement>
+          ))}
+        </div>
+      );
+    }
+
+    function App() {
+      const [componentNodes, setComponentNodes] = React.useState([]);
+      const [componentLines, setComponentLines] = React.useState([]);
+      const [componentGroups, setComponentGroups] = React.useState([]);
+      const [selectedNode, setSelectedNode] = React.useState(null);
+      const [uploadStatus, setUploadStatus] = React.useState(null);
+
+      function addComponentNode(node) {
+        console.log("Adding node", node);
+        setComponentNodes((prevNodes) => [...prevNodes, node]);
+      }
+
+      function addComponentLine(line) {
+        setComponentLines((prevLines) => [...prevLines, line]);
+      }
+
+      function handleNameChange(id, newName) {
+        setComponentNodes((prevSquares) =>
+          prevSquares.map((square) =>
+            square.id === id ? { ...square, name: newName } : square
+          )
+        );
+      }
+
+      function handlePropertyChange(id, paramName, newValue) {
+        setComponentNodes((prevSquares) =>
+          prevSquares.map((square) =>
+            square.id === id
+              ? {
+                ...square,
+                parameters: square.parameters.map((param) =>
+                  param.name === paramName
+                    ? { ...param, value: newValue }
+                    : param
+                ),
+              }
+              : square
+          )
+        );
+      }
+
+      async function compileComponents() {
+        console.log("Compiling components");
+
+        setUploadStatus("Uploading");
+
+        const cleanedNodes = componentNodes.map((node) => ({
+          id: node.id,
+          name: node.name,
+          type: node.type,
+          mode: node.mode,
+          x: node.x,
+          y: node.y,
+          parameters: node.parameters,
+        }));
+
+        const cleanedLines = componentLines.map((line) => ({
+          id: line.id,
+          start: line.start,
+          end: line.end,
+        }));
+
+        const cleanedGroups = componentGroups.map((group) => ({
+          id: group.id,
+          nodes: group.nodes,
+        }));
+
+        // get list of nodes without type of linkOut or linkIn
+        const basicNodes = cleanedNodes.filter(
+          (node) => node.type !== "LinkOut" && node.type !== "LinkIn"
+        );
+
+        // get list of nodes with type of linkOut or linkIn
+        const linkNodes = cleanedNodes.filter(
+          (node) => node.type === "LinkOut" || node.type === "LinkIn"
+        );
+
+        const compiledNodes = basicNodes;
+
+        const compiledLines = cleanedLines.map((line) => {
+          const link = linkNodes.find((linkNode) => linkNode.id === line.end);
+          const target = link?.parameters.find(
+            (param) => param.name === "Target"
+          );
+          const targetLink = linkNodes.find(
+            (linkNode) => linkNode.id === target?.value
+          );
+          if (targetLink) {
+            const targetLinkTargets = cleanedLines.filter(
+              (line) => line.start === targetLink?.id
+            );
+            return targetLinkTargets.map((targetLinkTarget) => ({
+              id: generateUUID(),
+              start: line.start,
+              end: targetLinkTarget.end,
+            }));
+          } else {
+            return line;
+          }
+        });
+
+        // check if the backend is running
+        let wasRunning = true;
+        try {
+          const response = await fetch("/status");
+          if (response.status === 200) {
+            const data = await response.json();
+            wasRunning = data.running;
+          }
+        } catch (error) {
+          console.error("Error:", error);
+        }
+
+        // stop the backend if it was running
+        let running = true;
+        if (wasRunning) {
+          console.log("Stopping backend");
+          try {
+            const response = await fetch("/stop", { method: "GET" });
+            if (response.status === 200) {
+              const data = await response.json();
+              running = data.running;
+            }
+          } catch (error) {
+            console.error("Error:", error);
+          }
+        }
+
+        // send generated JSON to /upload
+        try {
+          const response = await fetch("/upload", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -704,7 +789,7 @@
             body: JSON.stringify({
               generated: {
                 components: compiledNodes,
-                lines: compiledLines,
+                lines: compiledLines.flat(),
               },
               real: {
                 components: cleanedNodes,
@@ -712,96 +797,112 @@
                 groups: cleanedGroups,
               },
             }),
-          })
-            .then((response) => response)
-            .then((data) => {
-              console.log("Success:", data);
-              setUploadStatus("Success");
-            })
-            .catch((error) => {
-              console.error("Error:", error);
-              setUploadStatus("Error");
-            });
+          });
+
+          if (response.status === 200) {
+            setUploadStatus("Upload OK");
+          } else {
+            setUploadStatus("Error");
+          }
+        } catch (error) {
+          console.error("Error:", error);
+          setUploadStatus("Error");
         }
 
-        React.useEffect(() => {
-          fetch("/download")
-            .then((response) => response.json())
-            .then((data) => {
-              console.log("Downloaded:", data);
-              setComponentNodes(data.real.components);
-              setComponentLines(data.real.lines);
-              setComponentGroups(data.real.groups);
-            })
-            .catch((error) => {
-              console.error("Error:", error);
-            });
-        }, []);
+        // start the backend if it was running before
+        if (wasRunning) {
+          console.log("Starting backend");
+          try {
+            const response = await fetch("/start", { method: "GET" });
+            if (response.status === 200) {
+              const data = await response.json();
+              running = data.running;
+            }
+          } catch (error) {
+            console.error("Error:", error);
+          }
+        }
+      }
 
-        return (
-          <div style={{ display: "flex" }}>
-            <LeftSidebar
-              cards={cards}
-              addComponentNode={addComponentNode}
-              compileComponents={compileComponents}
-              uploadStatus={uploadStatus}
-            />
-            <div style={{ marginLeft: "220px", padding: "10px", flexGrow: 1 }}>
-              <Graph
-                style={{ width: "100%", height: "95vh" }}
-                nodes={componentNodes}
-                setNodes={setComponentNodes}
-                groups={componentGroups}
-                setGroups={setComponentGroups}
-                lines={componentLines}
-                setLines={setComponentLines}
-                onLineAdded={addComponentLine}
-                onNodeSelected={setSelectedNode}
-                onDrop={(e) => {
-                  console.log("Drop", e);
-                  const cardData = e.dataTransfer.getData("card");
-                  if (cardData) {
-                    const card = JSON.parse(e.dataTransfer.getData("card"));
-                    const rect = e.target.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    addComponentNode({
-                      id: generateUUID(),
-                      name: card.name,
-                      type: card.type,
-                      mode: card.mode,
-                      x: x,
-                      y: y,
-                      parameters: card.parameters,
-                    });
-                  }
-                }}
-              />
-            </div>
-            <RightSidebar
-              selectedNode={componentNodes.find(
-                (node) => node.id === selectedNode
-              )}
-              handleNameChange={handleNameChange}
-              handlePropertyChange={handlePropertyChange}
-              handleDeleteSquare={() => {
-                setComponentNodes((prevNodes) =>
-                  prevNodes.filter((node) => node.id !== selectedNode)
-                );
-                setComponentLines((prevLines) =>
-                  prevLines.filter(
-                    (line) =>
-                      line.start !== selectedNode && line.end !== selectedNode
-                  )
-                );
-                setSelectedNode(null);
+      React.useEffect(() => {
+        fetch("/download")
+          .then((response) => response.json())
+          .then((data) => {
+            console.log("Downloaded:", data);
+            setComponentNodes(data.real.components);
+            setComponentLines(data.real.lines);
+            setComponentGroups(data.real.groups);
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+          });
+      }, []);
+
+      return (
+        <div style={{ display: "flex" }}>
+          <LeftSidebar
+            cards={cards}
+            addComponentNode={addComponentNode}
+            compileComponents={compileComponents}
+            uploadStatus={uploadStatus}
+          />
+          <div style={{ marginLeft: "220px", padding: "10px", flexGrow: 1 }}>
+            <Graph
+              style={{ width: "100%", height: "95vh" }}
+              nodes={componentNodes}
+              setNodes={setComponentNodes}
+              groups={componentGroups}
+              setGroups={setComponentGroups}
+              lines={componentLines}
+              setLines={setComponentLines}
+              onLineAdded={addComponentLine}
+              onNodeSelected={setSelectedNode}
+              onDrop={(e) => {
+                console.log("Drop", e);
+                const cardData = e.dataTransfer.getData("card");
+                if (cardData) {
+                  const card = JSON.parse(e.dataTransfer.getData("card"));
+                  const rect = e.target.getBoundingClientRect();
+                  const x = e.clientX - rect.left;
+                  const y = e.clientY - rect.top;
+                  addComponentNode({
+                    id: generateUUID(),
+                    name: card.name,
+                    type: card.type,
+                    mode: card.mode,
+                    x: x,
+                    y: y,
+                    parameters: card.parameters,
+                  });
+                }
               }}
             />
           </div>
-        );
-      }
+          <RightSidebar
+            selectedNode={componentNodes.find(
+              (node) => node.id === selectedNode
+            )}
+            handleNameChange={handleNameChange}
+            handlePropertyChange={handlePropertyChange}
+            handleDeleteSquare={() => {
+              setComponentNodes((prevNodes) =>
+                prevNodes.filter((node) => node.id !== selectedNode)
+              );
+              setComponentLines((prevLines) =>
+                prevLines.filter(
+                  (line) =>
+                    line.start !== selectedNode && line.end !== selectedNode
+                )
+              );
+              setSelectedNode(null);
+            }}
+          />
+        </div>
+      );
+    }
 
-      ReactDOM.render(<App />, document.getElementById("root"));
-    </script>
-  </body>
+    ReactDOM.render(<App />, document.getElementById("root"));
+  </script>
+</body>
+
 </html>

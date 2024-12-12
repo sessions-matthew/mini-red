@@ -41,7 +41,7 @@ void from_json(const json &j, Line &l) {
 }
 
 int main() {
-  ifstream file("../program.json");
+  ifstream file("program.json");
   json j = nlohmann::json::parse(file);
   vector<function<int()>> processors;
   map<string, Component *> componentsById;
