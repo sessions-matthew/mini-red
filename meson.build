@@ -4,7 +4,7 @@ project(
   version: '0.1',
   default_options: ['cpp_std=c++20'],
 )
-incdir = include_directories('./include', '/home/user/boost_1_86_0')
+incdir = include_directories('./include', '/usr/include/boost')
 
 executable(
   'my_executable',

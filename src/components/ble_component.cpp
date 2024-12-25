@@ -2,7 +2,7 @@
 
 // only compile on Linux
 #ifdef __linux__
-BleComponent::BleComponent(string id) : ComplexComponent(id) {}
+BleComponent::BleComponent(string id) : Component(id) {}
 
 BleComponent::~BleComponent() { printf("BleComponent destroyed\n"); }
 
